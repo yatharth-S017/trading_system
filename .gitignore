@@ -1,0 +1,36 @@
+# Environment & Credentials
+.env
+*.env
+!.env.example
+
+# Python virtual environment & cache
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# NautilusTrader logs and cache
+*.log
+*.jsonl
+catalog/
+data/
+
+# Frontend
+frontend/node_modules/
+
+
