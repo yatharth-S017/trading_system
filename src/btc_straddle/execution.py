@@ -263,6 +263,7 @@ class ShortStraddleConfig(StrategyConfig, kw_only=True):
     order_quantity: float | None = None
     limit_price: float | None = None
     environment: BybitEnvironment = BybitEnvironment.TESTNET
+    catalog: Any = None
 
 
 class ShortStraddleStrategy(OptionMarketDataStrategy):

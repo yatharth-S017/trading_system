@@ -39,6 +39,8 @@ class AppConfig:
     execute_trades: bool = False
     order_type: str = "LIMIT"
     order_quantity: float | None = None
+    catalog_path: str = "data/catalog"
+    enable_catalog: bool = True
 
     def __post_init__(self) -> None:
         """Validate safety invariants."""
@@ -70,6 +72,8 @@ class AppConfig:
             "execute_trades": str(self.execute_trades),
             "order_type": self.order_type,
             "order_quantity": str(self.order_quantity) if self.order_quantity is not None else "<auto>",
+            "catalog_path": self.catalog_path,
+            "enable_catalog": str(self.enable_catalog),
         }
 
 
@@ -119,6 +123,13 @@ def load_config(env_path: Path | str | None = None) -> AppConfig:
     order_qty_raw = os.getenv("ORDER_QUANTITY", "").strip()
     order_qty = float(order_qty_raw) if order_qty_raw else None
 
+    catalog_path_env = os.getenv("CATALOG_PATH", "data/catalog").strip()
+    enable_catalog_env = os.getenv("ENABLE_CATALOG", "true").strip().lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
     return AppConfig(
         api_key=api_key,
         api_secret=api_secret,
@@ -128,4 +139,6 @@ def load_config(env_path: Path | str | None = None) -> AppConfig:
         execute_trades=execute_trades_env,
         order_type=order_type_env,
         order_quantity=order_qty,
+        catalog_path=catalog_path_env,
+        enable_catalog=enable_catalog_env,
     )

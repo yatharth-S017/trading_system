@@ -37,6 +37,7 @@ class OptionMarketDataConfig(StrategyConfig, kw_only=True):
     tie_breaker: str = "lower"
     max_quote_logs: int = 10
     target_expiry_iso: str | None = None
+    catalog: Any = None
 
 
 class OptionMarketDataStrategy(Strategy):
@@ -56,6 +57,7 @@ class OptionMarketDataStrategy(Strategy):
         self._tie_breaker: str = config.tie_breaker
         self._max_quote_logs: int = config.max_quote_logs
         self._target_expiry_iso: str | None = config.target_expiry_iso
+        self._catalog: Any = getattr(config, "catalog", None)
 
         # Discovered options cache
         self.discovered_options: list[OptionMetadata] = []
@@ -113,6 +115,12 @@ class OptionMarketDataStrategy(Strategy):
         self.subscribe_quote_ticks(self._underlying_id)
         self.subscribed_instrument_ids.add(self._underlying_id)
 
+        # Persist underlying instrument definition to Data Catalog if enabled
+        if self._catalog is not None:
+            underlying_inst = self.cache.instrument(self._underlying_id)
+            if underlying_inst is not None:
+                self._catalog.record_instruments([underlying_inst])
+
     def on_quote_tick(self, tick: QuoteTick) -> None:
         """
         Invoked when a quote tick event is received.
@@ -125,6 +133,10 @@ class OptionMarketDataStrategy(Strategy):
         self.total_quotes_received += 1
         inst_id_str = str(tick.instrument_id)
         self.latest_quotes[inst_id_str] = tick
+
+        # Persist quote tick to Data Catalog buffer if catalog is enabled
+        if self._catalog is not None:
+            self._catalog.record_quote(tick)
 
         # 1. Check if tick is for the BTC reference instrument
         if tick.instrument_id == self._underlying_id:
@@ -235,6 +247,12 @@ class OptionMarketDataStrategy(Strategy):
             self.subscribe_quote_ticks(put_id)
             self.subscribed_instrument_ids.add(put_id)
 
+            # Persist selected ATM Call and Put instrument definitions to Data Catalog
+            if self._catalog is not None:
+                call_inst = self.cache.instrument(call_id)
+                put_inst = self.cache.instrument(put_id)
+                self._catalog.record_instruments([i for i in (call_inst, put_inst) if i is not None])
+
         except Exception as e:
             self.log.exception(f"Failed to pair ATM straddle: {e}")
 
@@ -248,3 +266,9 @@ class OptionMarketDataStrategy(Strategy):
             self.unsubscribe_quote_ticks(inst_id)
         self.subscribed_instrument_ids.clear()
         self.log.info("Unsubscribed from all market data feeds.")
+
+        # Flush any remaining buffered quotes to the Data Catalog
+        if self._catalog is not None:
+            flushed = self._catalog.flush()
+            if flushed > 0:
+                self.log.info(f"Flushed {flushed} remaining quotes to Data Catalog on stop.")

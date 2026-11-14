@@ -106,6 +106,18 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="Disable the FastAPI server (useful when running headless / in tests).",
     )
+    parser.add_argument(
+        "--catalog-path",
+        type=str,
+        default=None,
+        help="Path for ParquetDataCatalog storage. Default: data/catalog or CATALOG_PATH env.",
+    )
+    parser.add_argument(
+        "--no-catalog",
+        action="store_true",
+        default=False,
+        help="Disable ParquetDataCatalog market data persistence.",
+    )
     return parser.parse_args()
 
 
@@ -174,6 +186,21 @@ def main() -> int:
         logger.exception(f"Failed to create TradingNode: {e}")
         return 1
 
+    # 2b. Initializing ParquetDataCatalog if enabled
+    catalog = None
+    enable_catalog = config.enable_catalog and not getattr(args, "no_catalog", False)
+    if enable_catalog:
+        catalog_path = getattr(args, "catalog_path", None) or config.catalog_path
+        try:
+            from src.btc_straddle.data_catalog import StraddleDataCatalog
+
+            catalog = StraddleDataCatalog(catalog_path=catalog_path)
+            logger.info(
+                f"ParquetDataCatalog active for market data persistence at: {catalog.catalog_path}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize StraddleDataCatalog (continuing without catalog): {e}")
+
     # 3. Attaching ShortStraddleStrategy
     logger.info(
         f"Step 3: Registering ShortStraddleStrategy (underlying={args.underlying}, "
@@ -189,6 +216,7 @@ def main() -> int:
         order_quantity=order_qty,
         limit_price=args.limit_price,
         environment=config.environment,
+        catalog=catalog,
     )
     strategy = ShortStraddleStrategy(config=strategy_config)
     node.trader.add_strategy(strategy)
@@ -235,6 +263,11 @@ def main() -> int:
             node.dispose()
         except Exception:
             pass
+
+        if catalog is not None:
+            flushed = catalog.flush()
+            if flushed > 0:
+                logger.info(f"DataCatalog: Flushed {flushed} final buffered quotes on shutdown.")
 
         report = strategy.get_execution_report()
         if report:
