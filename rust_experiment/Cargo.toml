@@ -1,0 +1,8 @@
+[package]
+name = "btc_straddle_experiment"
+version = "0.1.0"
+edition = "2021"
+description = "Auto-generated experimental Rust port of selected Python modules"
+
+# No external dependencies for the initial experiment.
+[dependencies]
